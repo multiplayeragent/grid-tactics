@@ -1,0 +1,21 @@
+{
+  "name": "Grid Tactics",
+  "genre": "strategy",
+  "dim": "2D",
+  "mode": "Turn-based",
+  "players": "2",
+  "hook": "Tanks, infantry, artillery. Capture their HQ.",
+  "how": "Take turns moving your units across forests, mountains and roads, then fire. Infantry capture cities for more gold each turn; spend it at your bases on new units. Capture the enemy HQ or wipe out their army to win. Alone? A bot commander takes the other side.",
+  "controls": "Click or tap a unit, then a blue tile to drive or a red one to fire; tap your base to build",
+  "uses": [
+    ["Host-run rules", "The host's browser checks every move and plays the bot commander; if it leaves, the next player takes over."],
+    ["Bots", "A bot commander plays the other side when you're alone, and a friend who joins takes over from it."],
+    ["Live sync", "Both players and anyone watching see the same battle; it carries on if someone reloads while another player stays."],
+    ["Leaderboard", "Most wins, shown after every battle."]
+  ],
+  "ideas": [
+    "Add a helicopter that flies over rivers and mountains",
+    "Draw a bigger map with a sea in the middle",
+    "Add fog of war so you only see near your units"
+  ]
+}
