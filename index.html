@@ -78,7 +78,8 @@
  *   - The whole battle lives in ONE shared field, `game`: {id, v, seats, turn, day, tt, t, gold,
  *     own, cap, u, nid, phase, win, why, at, endsAt, last}. `own` is one letter per building
  *     ("a" blue, "b" red, "-" nobody); `u` lists the units [id, side, type, x, y, hp, state]
- *     (state 0 ready, 1 moved, 2 done). Only the HOST writes it; `v` goes up on every write.
+ *     (state 0 ready, 1 moved, 2 done); `cap` is building -> [points left, side, infantry id].
+ *     Only the HOST writes it; `v` goes up on every write.
  *   - The HOST is the lowest sessionId among live players (heartbeat seen in the last 3s),
  *     worked out every frame. It checks every action with the RULES, plays the bot commander
  *     one action at a time, ends a turn when its timer runs out and decides the winner. A new
@@ -253,14 +254,14 @@ const canCapture = (x, u) => CONFIG.units[u[2]].capture && u[6] < 2 && bAt(u[3],
 const copy = (g) => ({ ...g, own: g.own.split(""), u: g.u.map((u) => u.slice()), gold: g.gold.slice(), cap: { ...g.cap } });
 const done = (x) => ({ ...x, own: x.own.join("") });
 function finish(x, win, why) { Object.assign(x, { phase: "over", win, why, endsAt: Date.now() + CONFIG.resultsMs }); }
-/** Begin side s's turn: income, heal on own buildings, every unit ready, half-done captures dropped if the infantry left. */
+/** Begin side s's turn: income, heal on own buildings, every unit ready, half-done captures dropped if the infantry that started them left. */
 function startTurn(x, s) {
   x.turn = s; x.tt++;
   if (s === 0) x.day++;
   const inc = owned(x, s) * CONFIG.income;
   x.gold[s] += inc;
   for (const u of x.u) if (u[1] === s) { u[6] = 0; const b = bAt(u[3], u[4]); if (b >= 0 && x.own[b] === CH[s]) u[5] = Math.min(10, u[5] + CONFIG.heal); }
-  for (const b of Object.keys(x.cap)) { const B = BUILDINGS[b], on = unitAt(x, B.x, B.y); if (!on || on[1] !== x.cap[b][1]) delete x.cap[b]; }
+  for (const b of Object.keys(x.cap)) { const B = BUILDINGS[b], on = unitAt(x, B.x, B.y); if (!on || on[0] !== x.cap[b][2]) delete x.cap[b]; }
   const now = Date.now();
   x.endsAt = now + CONFIG.turnMs; x.at = now + 900;
   x.last = { n: x.last.n + 1, k: "turn", s, inc };
@@ -269,7 +270,8 @@ function endTurn(x) {
   if (x.turn === 1 && x.day >= CONFIG.days) {
     const sc = (s) => owned(x, s) * 1000 + unitsOf(x, s).reduce((n, u) => n + CONFIG.units[u[2]].cost * u[5] / 10, 0);
     const w = sc(0) === sc(1) ? -1 : sc(0) > sc(1) ? 0 : 1;
-    finish(x, w, w < 0 ? `Dead even after ${CONFIG.days} days` : `More buildings after ${CONFIG.days} days`);
+    const tie = owned(x, 0) === owned(x, 1); // same buildings: the stronger army (by unit value) wins
+    finish(x, w, w < 0 ? `Dead even after ${CONFIG.days} days` : tie ? `Same buildings, stronger army after ${CONFIG.days} days` : `More buildings after ${CONFIG.days} days`);
     x.last = { n: x.last.n + 1, k: "end" };
     return;
   }
@@ -311,9 +313,9 @@ function applyAction(g, a) {
     if (!unitsOf(x, s).length && x.day >= 3) finish(x, foe, `${CONFIG.sides[s].name}'s army was wiped out`);
   } else if (a.k === "capture") {
     if (!u || !canCapture(x, u)) return null;
-    const b = bAt(u[3], u[4]), left = (x.cap[b] && x.cap[b][1] === s ? x.cap[b][0] : CONFIG.capturePoints) - u[5];
+    const b = bAt(u[3], u[4]), left = (x.cap[b] && x.cap[b][2] === u[0] ? x.cap[b][0] : CONFIG.capturePoints) - u[5]; // progress belongs to the infantry that started it
     u[6] = 2;
-    if (left > 0) { x.cap[b] = [left, s]; last = { k: "capture", id: u[0], b, left }; }
+    if (left > 0) { x.cap[b] = [left, s, u[0]]; last = { k: "capture", id: u[0], b, left }; }
     else {
       delete x.cap[b]; x.own[b] = CH[s]; last = { k: "capture", id: u[0], b, left: 0 };
       if (BUILDINGS[b].kind === "hq") finish(x, s, `${CONFIG.sides[s].name} took the enemy HQ`);
@@ -750,7 +752,7 @@ function panel(g, me) {
     info = `${u[1] === me ? "Your" : nameOf(g, u[1]) + "'s"} ${U.name.toLowerCase()} · ${u[5]}/10 HP · on ${on} (${"★".repeat(stars(u[3], u[4])) || "no cover"})`;
     if (mine && u[1] === me) {
       info += u[6] === 0 ? " · blue = drive, red = fire" : u[6] === 1 ? (canFire(u) && targetsFrom(g, u, u[3], u[4]).length ? " · red = fire" : " · moved") : " · done";
-      if (canCapture(g, u)) btns.push(["capture", `Capture (${(g.cap[bAt(u[3], u[4])]?.[1] === u[1] ? g.cap[bAt(u[3], u[4])][0] : CONFIG.capturePoints)} left)`]);
+      if (canCapture(g, u)) btns.push(["capture", `Capture (${(g.cap[bAt(u[3], u[4])]?.[2] === u[0] ? g.cap[bAt(u[3], u[4])][0] : CONFIG.capturePoints)} left)`]);
       if (u[6] < 2) btns.push(["wait", "Wait"]);
     }
   } else if (sel.base >= 0) {
@@ -776,7 +778,7 @@ $("acts").addEventListener("click", (e) => {
   if (a === "again") return playAgain();
   if (a === "end") { sel = { id: -1, base: -1 }; return act({ k: "end" }); }
   if (a === "capture" || a === "wait") { act({ k: a, id: sel.id }); sel = { id: -1, base: -1 }; return; }
-  if (a.startsWith("build")) { const B = BUILDINGS[sel.base]; act({ k: "build", x: B.x, y: B.y, type: +a.slice(5) }); sel = { id: -1, base: -1 }; }
+  if (a.startsWith("build") && sel.base >= 0) { const B = BUILDINGS[sel.base]; act({ k: "build", x: B.x, y: B.y, type: +a.slice(5) }); sel = { id: -1, base: -1 }; } // sel.base is -1 on a quick second tap
 });
 function showResults(g, me) {
   resultsFor = g.id;

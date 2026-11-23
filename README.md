@@ -6,7 +6,7 @@ Tanks, infantry, artillery. Capture their HQ. A multiplayer starter game from [M
 
 ## How it plays
 
-Take turns moving your units across forests, mountains and roads, then fire. Forests, mountains and buildings give cover; artillery hits from two or three tiles away but can't move and fire in the same turn. Infantry capture cities for more gold each turn; spend it at your bases on new units. Capture the enemy HQ or wipe out their army to win, or own more buildings after 20 days.
+Take turns moving your units across forests, mountains and roads, then fire. Forests, mountains and buildings give cover; artillery hits from two or three tiles away but can't move and fire in the same turn. Infantry capture cities for more gold each turn; spend it at your bases on new units. Capture the enemy HQ or wipe out their army to win, or own more buildings after 20 days (with the same number, the stronger army wins).
 
 **Controls:** Click or tap a unit, then a blue tile to drive or a red one to fire; tap your base to build. The red tiles show how much damage you'd do.
 
